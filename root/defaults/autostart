@@ -1,0 +1,2 @@
+/opt/cursor/AppRun && \
+(sleep 4 && xdotool key F11)
