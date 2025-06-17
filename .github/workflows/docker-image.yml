@@ -93,23 +93,27 @@ jobs:
   create-release:
     needs: [check-version, build-and-push]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Create GitHub Release
-        run: |
-          gh release create "${{ needs.check-version.outputs.latest_version }}" \
-            --title "Cursor ${{ needs.check-version.outputs.latest_version }}" \
-            --notes "Automated release for Cursor version ${{ needs.check-version.outputs.latest_version }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.check-version.outputs.latest_version }}
+          name: "Cursor ${{ needs.check-version.outputs.latest_version }}"
+          body: |
+            Automated release for Cursor version ${{ needs.check-version.outputs.latest_version }}
 
-          **Docker Images:**
-          - \`${{ env.DOCKER_REPO }}:${{ needs.check-version.outputs.latest_version }}\`
-          - \`${{ env.DOCKER_REPO }}:latest\`
+            **Docker Images:**
+            - `${{ env.DOCKER_REPO }}:${{ needs.check-version.outputs.latest_version }}`
+            - `${{ env.DOCKER_REPO }}:latest`
 
-          **Supported Architecture:**
-          - linux/amd64
+            **Supported Architecture:**
+            - linux/amd64
 
-          This release was automatically created when a new version of Cursor was detected from the official Cursor download API."
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+            This release was automatically created when a new version of Cursor was detected from the official Cursor download API.
+          draft: false
+          prerelease: false 

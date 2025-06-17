@@ -104,6 +104,9 @@ echo "**** cleanup ****" && \
 # add local files
 COPY /root /
 
+# fix permissions for executable files
+RUN chmod +x /usr/bin/github-desktop
+
 # ports and volumes
 EXPOSE 3000
 
