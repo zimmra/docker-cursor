@@ -1,35 +1,115 @@
-name: Docker Image CI
+name: Auto-build on Cursor Version Update
 
 on:
-  release:
-    types: [published]
+  schedule:
+    # Check for updates every day at 6:00 AM UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    # Allow manual triggering
+  push:
+    branches:
+      - main
+    paths:
+      - 'Dockerfile'
+      - '.github/workflows/docker-image.yml'
+
+env:
+  DOCKER_REPO: pzubuntu593/docker-cursorai
 
 jobs:
-
-  build:
-
-    runs-on: self-hosted
-
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      current_version: ${{ steps.current.outputs.version }}
+      latest_version: ${{ steps.latest.outputs.version }}
+      should_build: ${{ steps.compare.outputs.should_build }}
     steps:
-    -
-      name: Checkout
-      uses: actions/checkout@v3
-    - 
-      name: Set up QEMU
-      uses: docker/setup-qemu-action@v2
-    - 
-      name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-    - 
-      name: Login to Docker Hub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-    -
-      name: Build and push
-      uses: docker/build-push-action@v4
-      with:
-        context: .
-        push: true
-        tags: pzubuntu593/docker-cursorai:latest,pzubuntu593/docker-cursorai:${{ github.ref_name }}
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get current version from latest release
+        id: current
+        run: |
+          # Get the latest release tag, fallback to empty if no releases exist
+          CURRENT_VERSION=$(gh release list --limit 1 --json tagName --jq '.[0].tagName // ""')
+          echo "Current version: $CURRENT_VERSION"
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get latest Cursor version from API
+        id: latest
+        run: |
+          # Fetch and extract the latest Cursor version from the download API
+          LATEST_VERSION=$(curl -s 'https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable' | jq -r '.version')
+          echo "Latest version: $LATEST_VERSION"
+          echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Compare versions
+        id: compare
+        run: |
+          CURRENT="${{ steps.current.outputs.version }}"
+          LATEST="${{ steps.latest.outputs.version }}"
+          
+          if [ -z "$CURRENT" ] || [ "$CURRENT" != "$LATEST" ]; then
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "Version update detected: $CURRENT -> $LATEST"
+          else
+            echo "should_build=false" >> $GITHUB_OUTPUT
+            echo "No version update needed: $CURRENT"
+          fi
+
+  build-and-push:
+    needs: check-version
+    if: needs.check-version.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCKER_REPO }}:${{ needs.check-version.outputs.latest_version }}
+            ${{ env.DOCKER_REPO }}:latest
+          build-args: |
+            BUILD_DATE=${{ github.run_id }}
+            VERSION=${{ github.run_id }}
+            CURSOR_VERSION=${{ needs.check-version.outputs.latest_version }}
+
+  create-release:
+    needs: [check-version, build-and-push]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create GitHub Release
+        run: |
+          gh release create "${{ needs.check-version.outputs.latest_version }}" \
+            --title "Cursor ${{ needs.check-version.outputs.latest_version }}" \
+            --notes "Automated release for Cursor version ${{ needs.check-version.outputs.latest_version }}
+
+          **Docker Images:**
+          - \`${{ env.DOCKER_REPO }}:${{ needs.check-version.outputs.latest_version }}\`
+          - \`${{ env.DOCKER_REPO }}:latest\`
+
+          **Supported Architecture:**
+          - linux/amd64
+
+          This release was automatically created when a new version of Cursor was detected from the official Cursor download API."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 

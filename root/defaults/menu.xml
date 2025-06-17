@@ -3,5 +3,8 @@
 <menu id="root-menu" label="MENU">
 <item label="xterm" icon="/usr/share/pixmaps/xterm-color_48x48.xpm"><action name="Execute"><command>/usr/bin/xterm</command></action></item>
 <item label="Cursor" icon="/opt/cursor/code.png"><action name="Execute"><command>/opt/cursor/AppRun</command></action></item>
+<item label="FireFox" icon="/usr/share/icons/hicolor/48x48/apps/firefox.png"><action name="Execute"><command>/usr/bin/firefox</command></action></item>
+<item label="Github Desktop" icon="/usr/share/icons/hicolor/64x64/apps/github-desktop.png"><action name="Execute"><command>/usr/bin/github-desktop</command></action></item>
+<item label="Thunar" icon="/usr/share/icons/hicolor/48x48/apps/org.xfce.thunar.png"><action name="Execute"><command>/usr/bin/thunar</command></action></item>
 </menu>
 </openbox_menu>
