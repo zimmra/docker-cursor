@@ -1,6 +1,9 @@
 # Work-In-Progress
 ## Use at Your Own Risk
 
+### Cursor Code Editor for Web Browser / Kasm Workspace
+#### Bundled with Firefox, Thunar File Explorer, and GitHub Desktop for complete development environment
+
 Can be found at https://hub.docker.com/r/pzubuntu593/docker-cursorai
 
 Based off LSIO's implementation of [KasmVNC w/ Audacity](https://github.com/linuxserver/docker-audacity)
