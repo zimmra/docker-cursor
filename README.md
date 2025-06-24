@@ -14,7 +14,7 @@ Based off LSIO's implementation of [KasmVNC w/ Audacity](https://github.com/linu
 ---
 services:
   cursorai:
-    image: pzubuntu593/docker-cursorai:latest
+    image: pzubuntu593/docker-cursor:latest
     container_name: Cursor AI
     privileged: true
     security_opt:
