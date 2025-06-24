@@ -14,7 +14,7 @@ on:
       - '.github/workflows/docker-image.yml'
 
 env:
-  DOCKER_REPO: pzubuntu593/docker-cursorai
+  DOCKER_REPO: pzubuntu593/docker-cursor
 
 jobs:
   check-version:
