@@ -49,13 +49,32 @@ RUN \
   cd /tmp && \
   if [ -n "${CURSOR_VERSION}" ]; then \
     echo "**** using specified Cursor version: ${CURSOR_VERSION} ****" && \
-    CURSOR_API_RESPONSE=$(curl -s 'https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable') && \
-    CURSOR_DOWNLOAD_URL=$(echo "$CURSOR_API_RESPONSE" | grep -o '"downloadUrl":"[^"]*"' | cut -d'"' -f4); \
+    echo "**** fetching download URL from API ****" && \
+    CURSOR_API_RESPONSE=$(curl -L -s --max-time 30 \
+      --user-agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \
+      --header "Accept: application/json" \
+      'https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable' 2>/dev/null) && \
+    if [ -n "$CURSOR_API_RESPONSE" ] && echo "$CURSOR_API_RESPONSE" | grep -q '"downloadUrl"'; then \
+      CURSOR_DOWNLOAD_URL=$(echo "$CURSOR_API_RESPONSE" | grep -o '"downloadUrl":"[^"]*"' | cut -d'"' -f4); \
+    else \
+      echo "**** API failed, constructing download URL manually ****" && \
+      CURSOR_DOWNLOAD_URL="https://downloads.cursor.com/linux/x64/cursor-${CURSOR_VERSION}-x86_64.AppImage"; \
+    fi; \
   else \
     echo "**** fetching latest Cursor version ****" && \
-    CURSOR_DOWNLOAD_URL=$(curl -s \
-      'https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable' \
-      | grep -o '"downloadUrl":"[^"]*"' | cut -d'"' -f4); \
+    CURSOR_API_RESPONSE=$(curl -L -s --max-time 30 \
+      --user-agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \
+      --header "Accept: application/json" \
+      'https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable' 2>/dev/null) && \
+    if [ -n "$CURSOR_API_RESPONSE" ] && echo "$CURSOR_API_RESPONSE" | grep -q '"downloadUrl"'; then \
+      CURSOR_DOWNLOAD_URL=$(echo "$CURSOR_API_RESPONSE" | grep -o '"downloadUrl":"[^"]*"' | cut -d'"' -f4); \
+    else \
+      echo "**** ERROR: API failed and no version specified for fallback ****" && exit 1; \
+    fi; \
+  fi && \
+  echo "**** downloading from: $CURSOR_DOWNLOAD_URL ****" && \
+  if [ -z "$CURSOR_DOWNLOAD_URL" ]; then \
+    echo "**** ERROR: Download URL is empty ****" && exit 1; \
   fi && \
   curl -o \
     /tmp/cursor.app -L \
