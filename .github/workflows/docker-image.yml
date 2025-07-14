@@ -40,8 +40,32 @@ jobs:
       - name: Get latest Cursor version from API
         id: latest
         run: |
-          # Fetch and extract the latest Cursor version from the download API
-          LATEST_VERSION=$(curl -s 'https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable' | jq -r '.version')
+          # Fetch the latest Cursor version from the download API with retry logic
+          for attempt in 1 2; do
+            echo "Attempt $attempt: Fetching from Cursor API..."
+            API_RESPONSE=$(curl -s 'https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable')
+            echo "Raw API response:"
+            echo "$API_RESPONSE"
+            
+            # Check if response looks like JSON
+            if echo "$API_RESPONSE" | jq empty 2>/dev/null; then
+              LATEST_VERSION=$(echo "$API_RESPONSE" | jq -r '.version')
+              echo "Successfully parsed version: $LATEST_VERSION"
+              break
+            else
+              echo "ERROR: Invalid JSON response from API on attempt $attempt"
+              echo "Response content: $API_RESPONSE"
+              
+              if [ $attempt -eq 1 ]; then
+                echo "Waiting 30 seconds before retry..."
+                sleep 30
+              else
+                echo "Both attempts failed. Exiting."
+                exit 1
+              fi
+            fi
+          done
+          
           echo "Latest version: $LATEST_VERSION"
           echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
 
