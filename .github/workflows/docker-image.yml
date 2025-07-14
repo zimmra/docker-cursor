@@ -43,24 +43,57 @@ jobs:
           # Fetch the latest Cursor version from the download API with retry logic
           for attempt in 1 2; do
             echo "Attempt $attempt: Fetching from Cursor API..."
-            API_RESPONSE=$(curl -s 'https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable')
-            echo "Raw API response:"
-            echo "$API_RESPONSE"
             
-            # Check if response looks like JSON
-            if echo "$API_RESPONSE" | jq empty 2>/dev/null; then
-              LATEST_VERSION=$(echo "$API_RESPONSE" | jq -r '.version')
-              echo "Successfully parsed version: $LATEST_VERSION"
-              break
-            else
-              echo "ERROR: Invalid JSON response from API on attempt $attempt"
-              echo "Response content: $API_RESPONSE"
-              
-              if [ $attempt -eq 1 ]; then
-                echo "Waiting 30 seconds before retry..."
-                sleep 30
+            # Try with better curl options
+            API_RESPONSE=$(curl -L -s \
+              --max-time 30 \
+              --user-agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \
+              --header "Accept: application/json" \
+              'https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable' 2>&1)
+            
+            CURL_EXIT_CODE=$?
+            echo "Curl exit code: $CURL_EXIT_CODE"
+            echo "Raw API response:"
+            echo "'$API_RESPONSE'"
+            echo "Response length: ${#API_RESPONSE}"
+            
+            # Check if curl succeeded and response is not empty
+            if [ $CURL_EXIT_CODE -eq 0 ] && [ -n "$API_RESPONSE" ]; then
+              # Check if response looks like JSON
+              if echo "$API_RESPONSE" | jq empty 2>/dev/null; then
+                LATEST_VERSION=$(echo "$API_RESPONSE" | jq -r '.version')
+                echo "Successfully parsed version: $LATEST_VERSION"
+                break
               else
-                echo "Both attempts failed. Exiting."
+                echo "ERROR: Invalid JSON response from API on attempt $attempt"
+                echo "Response content: $API_RESPONSE"
+              fi
+            else
+              echo "ERROR: Curl failed or returned empty response on attempt $attempt"
+              echo "Curl exit code: $CURL_EXIT_CODE"
+              echo "Response: '$API_RESPONSE'"
+            fi
+            
+            if [ $attempt -eq 1 ]; then
+              echo "Waiting 30 seconds before retry..."
+              sleep 30
+            else
+              echo "Both attempts failed. Trying alternative method..."
+              
+              # Try alternative: scraping the downloads page
+              echo "Attempting to get version from downloads page..."
+              PAGE_CONTENT=$(curl -L -s --max-time 30 \
+                --user-agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36" \
+                'https://www.cursor.com/downloads' 2>&1)
+              
+              # Look for version pattern in the page
+              LATEST_VERSION=$(echo "$PAGE_CONTENT" | grep -oP 'version.*?"[0-9]+\.[0-9]+\.[0-9]+"' | head -1 | grep -oP '[0-9]+\.[0-9]+\.[0-9]+' || echo "")
+              
+              if [ -n "$LATEST_VERSION" ]; then
+                echo "Found version from downloads page: $LATEST_VERSION"
+                break
+              else
+                echo "Failed to extract version from downloads page as well."
                 exit 1
               fi
             fi
